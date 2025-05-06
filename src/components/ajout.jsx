@@ -30,7 +30,7 @@ useEffect(()=>{
         <button
           className="bg-blue-400 text-white px-5 py-1 rounded hover:bg-orange-600 transition duration-300"
         onClick={ajouterTache}>
-          ajouter
+          add
         </button>
       </div>
     </>
