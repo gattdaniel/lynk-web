@@ -1,35 +1,87 @@
-import React, { useState } from "react";
 import "./App.css";
-import Ajout from "./components/ajout";
-import Task from "./components/task";
-
-function App() {
-  // state
-  const [task, setTask] = useState([]);
-
-  const addTask = (newTask) => {
-    setTask((prevTasks) => [...prevTasks, newTask]);
-  };
-
-  // suppression
-  const deleteTask = (index) => {
-    const updatetask = task.filter((task, taskIndex) => taskIndex !== index);
-    setTask(updatetask);
-  };
-  // checkage
-  const toggleCheck = ()=>{
-    setTask(task)
-  }
+import { Routes, Route } from "react-router-dom";
+import { lazy, Suspense } from "react";
+import Room from "./pages/romm";
+import PrivateChat from "./pages/PrivateChat";
+import InboxList from "./components/InboxList";
+export default function App() {
+  const Login = lazy(() => import("./pages/login"));
+  const Signup = lazy(() => import("./pages/signup"));
+  const DepartmentPage = lazy(() => import("./pages/Privatedepartment"));
   return (
     <>
-      <h1 className="text-center mx-auto text-6xl mt-14 uppercase font-semibold">
-        to-do
-      </h1>
-
-      <Ajout addTask={addTask} />
-      <Task tasks={task} deleteTask={deleteTask} toggleCheck={toggleCheck}/>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <Suspense
+              fallback={
+                <div>
+                  <p className="text-white text-lg">Chargement...</p>
+                </div>
+              }
+            >
+              <Signup />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/login"
+          element={
+            <Suspense
+              fallback={
+                <div>
+                  <p className="text-white text-lg">Chargement...</p>
+                </div>
+              }
+            >
+              <Login />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/room"
+          element={
+            <Suspense
+              fallback={
+                <div>
+                  <p className="text-white text-lg">Chargement...</p>
+                </div>
+              }
+            >
+              <Room />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/departement/:nom"
+          element={
+            <Suspense
+              fallback={
+                <div>
+                  <p className="text-white text-lg">Chargement...</p>
+                </div>
+              }
+            >
+              <DepartmentPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/chat/:uid"
+          element={
+            <Suspense
+              fallback={
+                <div>
+                  <p className="text-white text-lg">Chargement...</p>
+                </div>
+              }
+            >
+              <PrivateChat />
+            </Suspense>
+          }
+        />
+      </Routes>
     </>
   );
 }
-
-export default App;

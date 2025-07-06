@@ -10,8 +10,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "esbuild": "^0.25.4",
+    "firebase": "^11.7.3",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-hook-form": "^7.56.3",
+    "react-router-dom": "^7.6.0",
+    "react-toastify": "^11.0.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",
