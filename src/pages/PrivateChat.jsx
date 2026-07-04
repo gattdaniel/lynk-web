@@ -1,134 +1,259 @@
 import { useParams } from "react-router-dom";
 import {
   collection,
-  addDoc,
   onSnapshot,
   orderBy,
   query,
-  serverTimestamp,
   where,
   deleteDoc,
   doc,
 } from "firebase/firestore";
 import { db } from "../services/Firebase";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState, useRef } from "react";
 import { AuthContext } from "../context/context";
-import InboxList from "../components/InboxList";
+import Choice from "../components/choice";
+import UserInfo from "../components/UserInfo";
+import MessageSender from "../components/Handlesend";
+
+
+const getColor = (name = "") => {
+  const colors = [
+    "#0b525b",
+    "#e17055",
+    "#6c5ce7",
+    "#00b894",
+    "#fd79a8",
+    "#0984e3",
+    "#e84393",
+    "#00cec9",
+  ];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash += name.charCodeAt(i);
+  return colors[hash % colors.length];
+};
+
+const getInitials = (name = "") =>
+  name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2) || "U";
+
+const getDateLabel = (timestamp) => {
+  if (!timestamp?.toDate) return "";
+  const date = timestamp.toDate();
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (date.toDateString() === today.toDateString()) return "Aujourd'hui";
+  if (date.toDateString() === yesterday.toDateString()) return "Hier";
+  return date.toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+};
 
 export default function PrivateChat() {
   const { user } = useContext(AuthContext);
   const { uid } = useParams();
   const [messages, setMessages] = useState([]);
-  const [message, setMessage] = useState("");
+  const bottomRef = useRef(null);
 
   const chatId = user ? [user.uid, uid].sort().join("_") : null;
 
+  // Charger les messages
   useEffect(() => {
     if (!chatId) return;
 
     const q = query(
       collection(db, "privateChats"),
       where("chatId", "==", chatId),
-      orderBy("timestamp", "desc")
+      orderBy("timestamp", "asc"), // asc pour bon ordre
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setMessages(data);
+      setMessages(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
     });
 
     return () => unsubscribe();
   }, [chatId]);
 
-  const sendMessage = async (e) => {
-    e.preventDefault();
-    if (!message.trim() || !user) return;
-
-    await addDoc(collection(db, "privateChats"), {
-      from: user.uid,
-      to: uid,
-      message: message.trim(),
-      timestamp: serverTimestamp(),
-      chatId,
-      participants: [user.uid, uid],
-    });
-
-    setMessage("");
-  };
+  // Scroll automatique vers le bas
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const handleDelete = async (id) => {
     try {
       await deleteDoc(doc(db, "privateChats", id));
-    } catch (error) {
-      console.error("Erreur lors de la suppression :", error);
+    } catch (err) {
+      console.error(err);
     }
   };
 
-  if (!user) return <div>Chargement...</div>;
+  if (!user)
+    return (
+      <div className="flex h-screen bg-black items-center justify-center text-white">
+        Chargement...
+      </div>
+    );
 
   return (
-    <div className="flex bg-[#204b57] min-h-screen relative">
-      {/* Sidebar droite - Inbox */}
-      <div className="hidden md:flex w-[20vw] p-4 h-[100vh] bg-[#0b525b] overflow-y-auto">
-        <InboxList />
+    <div className="flex h-screen bg-black">
+      {/* Sidebar gauche */}
+      <div className="hidden md:block w-1/10 bg-black rounded">
+        <Choice />
       </div>
 
-      {/* Contenu principal */}
-      <div className="flex flex-col flex-1 max-w-5xl mx-auto mt-10 mb-10 p-4 h-[85vh]">
-        <div className="text-white font-bold text-xl mb-4 text-center">
-          👤 Discussion Privée
+      {/* Zone principale */}
+      <div className="flex flex-col flex-1 h-screen">
+        {/* En-tête du chat */}
+        <div className="flex items-center gap-3 px-4 py-3 bg-[rgb(31,36,46)] border-b border-gray-700 flex-shrink-0">
+          <div className="w-9 h-9 rounded-full bg-[#0b525b] flex items-center justify-center text-white text-sm font-bold">
+            💬
+          </div>
+          <div>
+            <p className="text-white font-semibold text-sm">Chat privé</p>
+            <p className="text-gray-400 text-xs">Conversation privée</p>
+          </div>
         </div>
 
-        {/* Zone des messages */}
-        <div className="flex-1 overflow-y-auto flex flex-col-reverse custom-scrollbar space-y-2 space-y-reverse px-2">
-          {messages.map((msg) => {
-            const isOwn = msg.from === user.uid;
+        {/* Liste des messages */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-1 px-3 py-3">
+          {messages.map((msg, index, arr) => {
+            const isOwn = msg.from === user.uid || msg.uid === user.uid;
+            const avatarColor = getColor(msg.auteur || "");
+            const initials = getInitials(msg.auteur || "U");
+
+            // Séparateur de date
+            const currentLabel = getDateLabel(msg.timestamp);
+            const prevLabel =
+              index > 0 ? getDateLabel(arr[index - 1].timestamp) : null;
+            const showDateSeparator = currentLabel !== prevLabel;
+
             return (
-              <div key={msg.id} className={`flex ${isOwn ? "justify-end" : "justify-start"}`}>
+              <div key={msg.id} className="message-appear">
+                {/* SÉPARATEUR DE DATE */}
+                {showDateSeparator && currentLabel && (
+                  <div className="flex items-center gap-3 my-4">
+                    <div className="flex-1 h-px bg-gray-700"></div>
+                    <span className="text-xs text-gray-400 bg-[rgb(31,36,46)] px-3 py-1 rounded-full font-medium border border-gray-700">
+                      {currentLabel}
+                    </span>
+                    <div className="flex-1 h-px bg-gray-700"></div>
+                  </div>
+                )}
+
+                {/* BULLE DE MESSAGE */}
                 <div
-                  className={`max-w-[70%] p-3 rounded-lg shadow-sm border break-words ${
-                    isOwn
-                      ? "bg-[#0b525b] text-white rounded-br-none"
-                      : "bg-[#204b57] text-gray-200 rounded-bl-none"
-                  }`}
+                  className={`flex items-end gap-2 mb-2 ${isOwn ? "flex-row-reverse" : "flex-row"}`}
                 >
-                  <p>{msg.message}</p>
-                  {isOwn && (
-                    <button
-                      onClick={() => handleDelete(msg.id)}
-                      className="text-xs mt-2 text-red-300 hover:text-red-500"
+                  {/* Avatar */}
+                  {msg.photoURL ? (
+                    <img
+                      src={msg.photoURL}
+                      className="w-8 h-8 rounded-full object-cover flex-shrink-0 mb-1 border-2 border-gray-700"
+                      alt={msg.auteur}
+                    />
+                  ) : (
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mb-1 border-2 border-gray-700"
+                      style={{ background: avatarColor }}
                     >
-                      supprimer
-                    </button>
+                      {initials}
+                    </div>
                   )}
+
+                  {/* Contenu bulle */}
+                  <div
+                    className={`max-w-[70%] px-4 py-3 rounded-2xl shadow break-words
+                      ${
+                        isOwn
+                          ? "bg-[#0b525b] text-white rounded-br-none"
+                          : "bg-[rgb(43,53,66)] text-gray-200 rounded-bl-none"
+                      }`}
+                  >
+                    {/* Nom — seulement pour les messages reçus */}
+                    {!isOwn && (
+                      <p className="text-xs font-semibold text-teal-400 mb-1">
+                        {msg.auteur || "Utilisateur"}
+                      </p>
+                    )}
+
+                    {/* Media */}
+                    {msg.mediaType === "image" && (
+                      <img
+                        src={msg.mediaUrl}
+                        className="w-full rounded-lg mt-1 mb-2 max-h-60 object-cover"
+                        alt="media"
+                      />
+                    )}
+                    {msg.mediaType === "video" && (
+                      <video controls className="w-full rounded-lg mt-1 mb-2">
+                        <source src={msg.mediaUrl} />
+                      </video>
+                    )}
+                    {msg.mediaType === "file" && (
+                      <a
+                        href={msg.mediaUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-blue-400 underline mt-1 block text-sm"
+                      >
+                        📎 Télécharger le fichier
+                      </a>
+                    )}
+
+                    {/* Texte */}
+                    {msg.message && (
+                      <p className="text-sm leading-relaxed">{msg.message}</p>
+                    )}
+
+                    {/* Heure + supprimer  */}
+                    <div className="flex items-center justify-end mt-1 gap-2">
+                      <span className="text-xs text-gray-400">
+                        {msg.timestamp?.toDate
+                          ? new Date(msg.timestamp.toDate()).toLocaleTimeString(
+                              [],
+                              {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              },
+                            )
+                          : ""}
+                      </span>
+                      {isOwn && (
+                        <button
+                          onClick={() => handleDelete(msg.id)}
+                          className="text-xs text-red-400 hover:text-red-500 bg-transparent p-0 h-auto leading-none"
+                        >
+                          🗑️
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             );
           })}
+
+          {/* Div invisible pour scroll automatique */}
+          <div ref={bottomRef} />
         </div>
 
-        {/* Formulaire d'envoi */}
-        <form
-          onSubmit={sendMessage}
-          className="fixed bottom-0 left-[50%] transform -translate-x-1/2 w-full max-w-3xl flex items-center gap-2 bg-[#204b57] p-4 rounded-t-xl shadow-md z-20"
-        >
-          <input
-            type="text"
-            placeholder="Entrez un message"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            className="flex-1 px-4 py-2 bg-[#0b525b] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
-          />
-          <button
-            type="submit"
-            className="px-4 py-2 bg-[#0b525b] text-white font-semibold rounded-lg hover:bg-blue-700 transition"
-          >
-            <img src="/fleche.png" alt="Envoyer" className="w-5 h-5" />
-          </button>
-        </form>
+        {/* Zone d'envoi */}
+        <MessageSender
+          collectionName="privateChats"
+          type="private"
+          chatId={chatId}
+        />
+      </div>
+
+      {/* Sidebar droite */}
+      <div className="hidden md:flex border-l w-[20vw] p-4 h-screen bg-[rgb(31,36,46)]">
+        <UserInfo contactId={uid} />
       </div>
     </div>
   );

@@ -19,6 +19,16 @@ function AuthProvider({ children }) {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         try {
+          // Marquer comme en ligne
+          await setDoc(
+            doc(db, "users", currentUser.uid),
+            {
+              online: true,
+              lastSeen: new Date().toISOString(),
+            },
+            { merge: true },
+          );
+
           const docRef = doc(db, "users", currentUser.uid);
           const docSnap = await getDoc(docRef);
 
@@ -27,25 +37,35 @@ function AuthProvider({ children }) {
               uid: currentUser.uid,
               email: currentUser.email,
               displayName: currentUser.displayName,
+              ...docSnap.data(),
               photoURL: currentUser.photoURL,
-              ...docSnap.data(), // récupère departement, rôle, etc.
             };
             setUser(fullUser);
           } else {
-            setUser(currentUser); // fallback au cas où pas de doc
+            setUser(currentUser);
           }
         } catch (error) {
           console.error("Erreur récupération Firestore:", error);
-          setUser(currentUser); // fallback si erreur
+          setUser(currentUser);
         }
       } else {
+        // Marquer comme hors ligne
+        if (auth.currentUser) {
+          await setDoc(
+            doc(db, "users", auth.currentUser.uid),
+            {
+              online: false,
+              lastSeen: new Date().toISOString(),
+            },
+            { merge: true },
+          );
+        }
         setUser(null);
       }
-
       setLoading(false);
     });
 
-    return () => unsubscribe(); // clean listener
+    return () => unsubscribe();
   }, []);
   // inscription
 
@@ -53,14 +73,13 @@ function AuthProvider({ children }) {
     const userCredential = await createUserWithEmailAndPassword(
       auth,
       email,
-      password
+      password,
     );
 
     await updateProfile(userCredential.user, {
       displayName: userData.name,
     });
 
-    // 🧠 Enregistrement dans Firestore
     await setDoc(doc(db, "users", userCredential.user.uid), {
       email: userData.email,
       name: userData.name,
@@ -83,6 +102,7 @@ function AuthProvider({ children }) {
   const id = {
     user,
     loading,
+    setUser,
     SignUp,
     Login,
     Logout,

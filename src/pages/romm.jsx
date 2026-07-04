@@ -1,46 +1,114 @@
 import {
-  addDoc,
   collection,
   deleteDoc,
   doc,
   orderBy,
   query,
-  serverTimestamp,
   onSnapshot,
   where,
   getDoc,
 } from "firebase/firestore";
 import { db } from "../services/Firebase";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState, useRef } from "react";
 import Department from "../components/departement";
 import { AuthContext } from "../context/context";
 import { Link } from "react-router-dom";
 import InboxList from "../components/InboxList";
+import Profil from "../components/Profil";
+import Choice from "../components/choice";
+import MessageSender from "../components/Handlesend";
 
-// Composant Modal pour afficher profil utilisateur (inchangé)
+// ===========================
+// HELPER — Couleur unique par nom
+// ===========================
+const getColor = (name = "") => {
+  const colors = [
+    "#0b525b",
+    "#e17055",
+    "#6c5ce7",
+    "#00b894",
+    "#fd79a8",
+    "#0984e3",
+    "#e84393",
+    "#00cec9",
+  ];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash += name.charCodeAt(i);
+  return colors[hash % colors.length];
+};
+
+// ===========================
+// HELPER — Initiales depuis le nom
+// ===========================
+const getInitials = (name = "") =>
+  name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2) || "U";
+
+// ===========================
+// HELPER — Label de date
+// ===========================
+const getDateLabel = (timestamp) => {
+  if (!timestamp?.toDate) return "";
+  const date = timestamp.toDate();
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  if (date.toDateString() === today.toDateString()) return "Aujourd'hui";
+  if (date.toDateString() === yesterday.toDateString()) return "Hier";
+  return date.toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+};
+
+// ===========================
+// MODALE PROFIL
+// ===========================
 function ProfileModal({ isOpen, onClose, profileData }) {
   if (!isOpen) return null;
-
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50"
+      className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-lg p-6 max-w-sm w-full"
+        className="bg-[rgb(31,36,46)] text-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-gray-700"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-2xl font-bold mb-4">Profil Utilisateur</h2>
-        <div className="space-y-2 text-gray-800">
-          <p><strong>Nom complet :</strong> {profileData.displayName || profileData.name || "Non renseigné"}</p>
-          <p><strong>Email :</strong> {profileData.email || "Non renseigné"}</p>
-          <p><strong>Matricule :</strong> {profileData.matricule || "Non renseigné"}</p>
-          <p><strong>Département :</strong> {profileData.departement || "Non renseigné"}</p>
-          <p><strong>Niveau :</strong> {profileData.niveau || "Non renseigné"}</p>
+        <h2 className="text-xl font-bold mb-4 text-teal-400">
+          Profil Utilisateur
+        </h2>
+        <div className="space-y-3 text-sm text-gray-300">
+          <p>
+            <span className="text-white font-semibold">Nom complet :</span>{" "}
+            {profileData.displayName || profileData.name || "Non renseigné"}
+          </p>
+          <p>
+            <span className="text-white font-semibold">Email :</span>{" "}
+            {profileData.email || "Non renseigné"}
+          </p>
+          <p>
+            <span className="text-white font-semibold">Matricule :</span>{" "}
+            {profileData.matricule || "Non renseigné"}
+          </p>
+          <p>
+            <span className="text-white font-semibold">Département :</span>{" "}
+            {profileData.departement || "Non renseigné"}
+          </p>
+          <p>
+            <span className="text-white font-semibold">Niveau :</span>{" "}
+            {profileData.niveau || "Non renseigné"}
+          </p>
         </div>
         <button
           onClick={onClose}
-          className="mt-6 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          className="mt-6 w-full px-4 py-2 bg-[#0b525b] text-white rounded-lg hover:bg-[#127f8a] transition"
         >
           Fermer
         </button>
@@ -49,119 +117,75 @@ function ProfileModal({ isOpen, onClose, profileData }) {
   );
 }
 
+// ===========================
+// COMPOSANT PRINCIPAL
+// ===========================
 export default function Room() {
   const { user } = useContext(AuthContext);
-
   const [notifications, setNotifications] = useState([]);
-  const [message, setMessage] = useState("");
-  const [reactions, setReactions] = useState({});
-
   const [drawerDeptOpen, setDrawerDeptOpen] = useState(false);
-  const [drawerInboxOpen, setDrawerInboxOpen] = useState(false); // Nouveau drawer Inbox
-
+  const [drawerInboxOpen, setDrawerInboxOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [profileData, setProfileData] = useState(null);
 
+  // Ref pour le scroll automatique vers le bas
+  const bottomRef = useRef(null);
+
+  // Charger les messages
   useEffect(() => {
     const q = query(
       collection(db, "notifications"),
       where("type", "==", "global"),
-      orderBy("timestamp", "desc")
+      orderBy("timestamp", "asc"), // asc pour avoir les messages du plus ancien au plus récent
     );
-
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setNotifications(data);
+      setNotifications(
+        snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+      );
     });
-
     return () => unsubscribe();
   }, []);
 
-  async function fetchProfile() {
+  // Scroll automatique vers le bas à chaque nouveau message
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [notifications]);
+
+  // Charger le profil
+  const fetchProfile = async () => {
     if (!user?.uid) return;
     const docRef = doc(db, "users", user.uid);
     const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      setProfileData(docSnap.data());
-    } else {
-      setProfileData(null);
-    }
-  }
+    if (docSnap.exists()) setProfileData(docSnap.data());
+    else setProfileData(null);
+  };
 
   const openProfileModal = () => {
     fetchProfile();
     setShowModal(true);
   };
 
-  const HandleAdddoc = async (e) => {
-    e.preventDefault();
-    if (!message.trim()) return;
-    try {
-      await addDoc(collection(db, "notifications"), {
-        message: message.trim(),
-        timestamp: serverTimestamp(),
-        uid: user.uid,
-        auteur: user.displayName || "Utilisateur",
-        type: "global",
-      });
-      setMessage("");
-    } catch (error) {
-      console.log(error);
-    }
-  };
-
-  const handledelete = async (id) => {
+  const handleDelete = async (id) => {
     try {
       await deleteDoc(doc(db, "notifications", id));
-    } catch (error) {
-      console.log(error);
+    } catch (err) {
+      console.error(err);
     }
-  };
-
-  const handleReact = (messageId, emoji) => {
-    setReactions((prev) => {
-      const current = prev[messageId] || {};
-      const count = current[emoji] || 0;
-      return {
-        ...prev,
-        [messageId]: {
-          ...current,
-          [emoji]: count + 1,
-        },
-      };
-    });
   };
 
   return (
     <>
-      {/* Bandeau accueil avec nom cliquable */}
-      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-[#0b525b] text-white px-4 py-2 rounded-lg shadow-lg z-10">
-        👋 slt{" "}
-        <span
-          className="text-blue-400 underline cursor-pointer"
-          onClick={openProfileModal}
-          title="Voir mon profil"
-        >
-          {user?.displayName || "utilisateur"}
-        </span>
-      </div>
-
-      {/* Modale profil utilisateur */}
       <ProfileModal
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         profileData={profileData || {}}
       />
 
-      <div className="flex bg-[rgb(32,75,87)] min-h-screen relative">
-        {/* Bouton hamburger gauche (Départements) */}
+      <div className="flex bg-black h-screen relative">
+        {/* Hamburger gauche — Départements */}
         <button
-          className="sm:hidden absolute top-5 left-4 z-30 p-2 bg-[#0b525b] rounded-md focus:outline-none"
+          className="sm:hidden absolute top-5 left-4 z-30 p-2 bg-[#0b525b] rounded-md"
           onClick={() => setDrawerDeptOpen(!drawerDeptOpen)}
-          aria-label="Toggle departments menu"
         >
           <svg
             className="w-6 h-6 text-white"
@@ -178,11 +202,10 @@ export default function Room() {
           </svg>
         </button>
 
-        {/* Bouton hamburger droite (Inbox discussions) */}
+        {/* Hamburger droite — Inbox */}
         <button
-          className="md:hidden absolute top-5 right-4 z-30 p-2 bg-[#0b525b] rounded-md focus:outline-none"
+          className="md:hidden absolute top-5 right-4 z-30 p-2 bg-[#0b525b] rounded-md"
           onClick={() => setDrawerInboxOpen(!drawerInboxOpen)}
-          aria-label="Toggle inbox menu"
         >
           <svg
             className="w-6 h-6 text-white"
@@ -199,130 +222,176 @@ export default function Room() {
           </svg>
         </button>
 
-        {/* Drawer Départements gauche (mobile) */}
+        {/* Drawer Départements mobile */}
         <div
-          className={`fixed top-0 left-0 h-full w-64 bg-[#0b525b] p-4 z-20 transform transition-transform duration-300 ease-in-out
-            ${drawerDeptOpen ? "translate-x-0" : "-translate-x-full"} sm:hidden`}
+          className={`fixed top-0 left-0 h-full w-64 p-4 z-20 bg-[rgb(31,36,46)] transform transition-transform duration-300 ease-in-out ${drawerDeptOpen ? "translate-x-0" : "-translate-x-full"} sm:hidden`}
         >
-          {/* <button
-            className="mb-4 text-white font-bold"
-            onClick={() => setDrawerDeptOpen(false)}
-            aria-label="Close departments menu"
-          >
-           
-          </button> */}
           <Department />
         </div>
 
-        {/* Drawer Inbox droite (mobile) */}
+        {/* Drawer Inbox mobile */}
         <div
-          className={`fixed top-0 right-0 h-full w-64 bg-[#0b525b] p-4 z-20 transform transition-transform duration-300 ease-in-out
-            ${drawerInboxOpen ? "translate-x-0" : "translate-x-full"} md:hidden`}
+          className={`fixed top-0 right-0 h-full w-64 p-4 z-20 bg-[rgb(31,36,46)] transform transition-transform duration-300 ease-in-out ${drawerInboxOpen ? "translate-x-0" : "translate-x-full"} md:hidden`}
         >
-          {/* <button
-            className="mb-4 text-white font-bold"
-            onClick={() => setDrawerInboxOpen(false)}
-            aria-label="Close inbox menu"
-          >
-           
-          </button> */}
           <InboxList />
         </div>
 
-        {/* Sidebar fixe desktop gauche */}
-        <div className="hidden sm:block w-[20vw] h-screen p-4 bg-[#0b525b]">
-          <Department />
+        {/* Sidebar desktop gauche */}
+        <div className="hidden md:block w-1/10 bg-black rounded">
+          <Choice />
         </div>
 
-        {/* Contenu principal */}
-        <div className="flex flex-col flex-1 max-w-5xl mx-auto mt-10 mb-10 p-4 h-[85vh]">
-          <div className="flex-1 overflow-y-auto flex custom-scrollbar flex-col-reverse space-y-2 space-y-reverse px-2">
-            {notifications.map((notif) => {
+        {/* Zone principale chat */}
+        <div className="flex flex-col flex-1 max-w-5xl mx-auto h-screen">
+          {/* Salutation en haut */}
+          <div className="flex justify-center mt-4 mb-2">
+            <div className="bg-[rgb(43,53,66)] text-white px-4 py-1 rounded-lg shadow-lg text-sm">
+              salut{" "}
+              <span
+                className="cursor-pointer font-semibold text-teal-400 hover:underline"
+                onClick={openProfileModal}
+                title="Voir mon profil"
+              >
+                {user?.displayName || "utilisateur"}
+              </span>{" "}
+              👋
+            </div>
+          </div>
+
+          {/* Liste des messages */}
+          <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-1 px-3 mt-2 mb-2">
+            {notifications.map((notif, index, arr) => {
               const isOwn = notif.uid === user?.uid;
+              const avatarColor = getColor(notif.auteur || "");
+              const initials = getInitials(notif.auteur || "U");
+
+              // Séparateur de date
+              const currentLabel = getDateLabel(notif.timestamp);
+              const prevLabel =
+                index > 0 ? getDateLabel(arr[index - 1].timestamp) : null;
+              const showDateSeparator = currentLabel !== prevLabel;
+
               return (
-                <div
-                  key={notif.id}
-                  className={`flex ${isOwn ? "justify-end" : "justify-start"}`}
-                >
+                <div key={notif.id}  className="message-appear">
+                  {/* SÉPARATEUR DE DATE */}
+                  {showDateSeparator && currentLabel && (
+                    <div className="flex items-center gap-3 my-4">
+                      <div className="flex-1 h-px bg-gray-700"></div>
+                      <span className="text-xs text-gray-400 bg-[rgb(31,36,46)] px-3 py-1 rounded-full font-medium border border-gray-700">
+                        {currentLabel}
+                      </span>
+                      <div className="flex-1 h-px bg-gray-700"></div>
+                    </div>
+                  )}
+
+                  {/* BULLE DE MESSAGE */}
                   <div
-                    className={`max-w-[70%] p-4 rounded-lg shadow-sm border break-words ${
-                      isOwn
-                        ? "bg-[#0b525b] text-white rounded-br-none"
-                        : "bg-[#204b57] text-gray-200 rounded-bl-none"
-                    }`}
+                    className={`flex items-end gap-2 mb-2 ${isOwn ? "flex-row-reverse" : "flex-row"}`}
                   >
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="font-semibold">
+                    {/* Avatar */}
+                    {notif.photoURL ? (
+                      <img
+                        src={notif.photoURL}
+                        className="w-8 h-8 rounded-full object-cover flex-shrink-0 mb-1 border-2 border-gray-700"
+                        alt={notif.auteur}
+                      />
+                    ) : (
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mb-1 border-2 border-gray-700"
+                        style={{ background: avatarColor }}
+                      >
+                        {initials}
+                      </div>
+                    )}
+
+                    {/* Contenu de la bulle */}
+                    <div
+                      className={`max-w-[70%] px-4 py-3 rounded-2xl shadow break-words
+                        ${
+                          isOwn
+                            ? "bg-[#0b525b] text-white rounded-br-none"
+                            : "bg-[rgb(43,53,66)] text-gray-200 rounded-bl-none"
+                        }`}
+                    >
+                      {/* Nom de l'auteur — seulement pour les messages des autres */}
+                      {!isOwn && (
                         <Link
                           to={`/chat/${notif.uid}`}
-                          className="font-semibold hover:underline"
+                          className="text-xs font-semibold text-teal-400 hover:underline block mb-1"
                         >
                           {notif.auteur || "Utilisateur"}
                         </Link>
-                      </span>
-                      <span className="text-xs text-gray-400">
-                        {notif.timestamp?.toDate
-                          ? new Date(
-                              notif.timestamp.toDate()
-                            ).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })
-                          : ""}
-                      </span>
-                    </div>
-                    <p>{notif.message}</p>
+                      )}
 
-                    <div className="flex gap-2 mt-2">
-                      {["👍", "❤️", "😂", "🔥"].map((emoji) => (
-                        <button
-                          key={emoji}
-                          onClick={() => handleReact(notif.id, emoji)}
-                          className="bg-[#204b57] px-2 py-1 rounded-full hover:bg-[#127f8a] text-sm"
-                          type="button"
+                      {/* Media */}
+                      {notif.mediaType === "image" && (
+                        <img
+                          src={notif.mediaUrl}
+                          className="w-full rounded-lg mt-1 mb-2 max-h-60 object-cover"
+                          alt="media"
+                        />
+                      )}
+                      {notif.mediaType === "video" && (
+                        <video controls className="w-full rounded-lg mt-1 mb-2">
+                          <source src={notif.mediaUrl} />
+                        </video>
+                      )}
+                      {notif.mediaType === "file" && (
+                        <a
+                          href={notif.mediaUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-blue-400 underline mt-1 block text-sm"
                         >
-                          {emoji} {reactions[notif.id]?.[emoji] || 0}
-                        </button>
-                      ))}
-                    </div>
+                          📎 Télécharger le fichier
+                        </a>
+                      )}
 
-                    {isOwn && (
-                      <button
-                        onClick={() => handledelete(notif.id)}
-                        className="text-xs mt-2 text-red-400 hover:text-red-600"
-                      >
-                        supprimer
-                      </button>
-                    )}
+                      {/* Texte du message */}
+                      {notif.message && (
+                        <p className="text-sm leading-relaxed">
+                          {notif.message}
+                        </p>
+                      )}
+
+                      {/* Heure + bouton supprimer */}
+                      <div className="flex items-center justify-end mt-1 gap-2">
+                        <span className="text-xs text-gray-400">
+                          {notif.timestamp?.toDate
+                            ? new Date(
+                                notif.timestamp.toDate(),
+                              ).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            : ""}
+                        </span>
+                        {isOwn && (
+                          <button
+                            onClick={() => handleDelete(notif.id)}
+                            className="text-xs text-red-400 hover:text-red-500 bg-transparent p-0 h-auto leading-none"
+                          >
+                            🗑️
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               );
             })}
+
+            {/* Div invisible pour le scroll automatique */}
+            <div ref={bottomRef} />
           </div>
 
-          <form
-            onSubmit={HandleAdddoc}
-            className="fixed bottom-0 left-[50%] transform -translate-x-1/2 w-full max-w-3xl flex items-center gap-2 bg-[#204b57] p-4 rounded-t-xl shadow-md z-20"
-          >
-            <input
-              type="text"
-              placeholder="Entrez un message"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              className="flex-1 px-4 py-2 bg-[#0b525b] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
-            />
-            <button
-              type="submit"
-              className="px-4 py-2 bg-[#0b525b] text-white font-semibold rounded-lg hover:bg-blue-700 transition"
-            >
-              <img src="fleche.png" alt="Ajouter" className="w-5 h-5" />
-            </button>
-          </form>
+          {/* Zone d'envoi de message */}
+          <MessageSender collectionName="notifications" type="global" />
         </div>
 
-        {/* Sidebar droite Desktop */}
-        <div className="hidden md:flex w-[20vw] p-4 h-[100vh] bg-[#0b525b] overflow-y-auto">
-          <InboxList />
+        {/* Sidebar desktop droite */}
+        <div className="hidden md:flex border-l sm:block w-[20vw] p-4 h-screen bg-[rgb(31,36,46)]">
+          <Profil />
         </div>
       </div>
     </>

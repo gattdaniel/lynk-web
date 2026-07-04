@@ -4,6 +4,20 @@ import { toast } from "react-toastify";
 import { AuthContext } from "../context/context";
 import { Link, useNavigate } from "react-router-dom";
 
+const departements = [
+  "Génie Électrique et Informatique Industrielle (GEII)",
+  "Génie Industriel et Maintenance (GIM)",
+  "Génie Mécanique et Productique (GMP)",
+  "Génie Thermique et Énergie (GTE)",
+  "Génie Civil (GCI)",
+  "Génie Informatique (GI)",
+  "Génie Logistique et Transport (GLT)",
+  "Organisation et Gestion Administrative (OGA)",
+  "Gestion des Entreprises et des Administrations (GEA)",
+];
+
+const niveaux = ["L1", "L2", "L3", "M1", "M2", "Doctorat"];
+
 export default function Signup() {
   const { SignUp } = useContext(AuthContext);
   const [loading, setLoading] = useState(false);
@@ -16,124 +30,111 @@ export default function Signup() {
     formState: { errors },
   } = useForm();
 
-  // Liste des départements disponibles
-  const departements = [
-    "Génie Électrique et Informatique Industrielle (GEII)",
-    "Génie Industriel et Maintenance (GIM",
-    "Génie Mécanique et Productique (GMP)",
-    "Génie Thermique et Énergie (GTE)",
-    "Génie Civil (GCI)",
-    "Génie Informatique (GI)",
-    "Génie Logistique et Transport (GLT)",
-    "Organisation et Gestion Administrative (OGA)",
-    "Gestion des Entreprises et des Administrations (GEA)",
-  ];
-
-  // Niveaux d'études
-  const niveaux = ["L1", "L2", "L3", "M1", "M2", "Doctorat"];
-
   const handleSignUp = async (data) => {
-  // Validation des champs obligatoires
-  if (
-    !data.email ||
-    !data.password ||
-    !data.name ||
-    !data.matricule ||
-    !data.departement
-  ) {
-    toast.error("Veuillez remplir tous les champs obligatoires");
-    return;
-  }
-
-  // Validation du format matricule (exemple: 20I24001)
-  const matriculeRegex = /^\d{2}[A-Z]\d{5}$/;
-  if (!matriculeRegex.test(data.matricule)) {
-    toast.error("Format de matricule invalide (ex: 20I24001)");
-    return;
-  }
-
-  if (loading) return;
-
-  try {
-    setLoading(true);
-
-    // 🔹 Génération automatique d'une photo de profil (pas besoin d'upload)
-    const photoURL = `https://ui-avatars.com/api/?name=${encodeURIComponent(data.name)}&background=random`;
-
-    // Données complètes de l'utilisateur
-    const userData = {
-      email: data.email,
-      name: data.name,
-      matricule: data.matricule.toUpperCase(),
-      departement: data.departement,
-      niveau: data.niveau || "L1",
-      createdAt: new Date().toISOString(),
-      isActive: true,
-      photoURL, // ✅ Ajout automatique de la photo
-    };
-
-    await SignUp(data.email, data.password, userData);
-    navigate("/room");
-    toast.success("Inscription réussie ! Bienvenue !");
-  } catch (error) {
-    console.log(error);
-    if (error.code === "auth/email-already-in-use") {
-      toast.error("Cette adresse email est déjà utilisée");
-    } else if (error.code === "auth/weak-password") {
-      toast.error("Le mot de passe est trop faible");
-    } else {
-      toast.error("Erreur lors de l'inscription");
+    if (
+      !data.email ||
+      !data.password ||
+      !data.name ||
+      !data.matricule ||
+      !data.departement
+    ) {
+      toast.error("Veuillez remplir tous les champs obligatoires");
+      return;
     }
-  } finally {
-    setLoading(false);
-  }
 
-  reset();
-};
+    const matriculeRegex = /^\d{2}[A-Z]\d{5}$/;
+    if (!matriculeRegex.test(data.matricule)) {
+      toast.error("Format de matricule invalide (ex: 20I24001)");
+      return;
+    }
 
+    if (loading) return;
+
+    try {
+      setLoading(true);
+      const photoURL = `https://ui-avatars.com/api/?name=${encodeURIComponent(data.name)}&background=0b525b&color=ffffff&bold=true`;
+
+      const userData = {
+        email: data.email,
+        name: data.name,
+        matricule: data.matricule.toUpperCase(),
+        departement: data.departement,
+        niveau: data.niveau || "L1",
+        createdAt: new Date().toISOString(),
+        isActive: true,
+        photoURL,
+      };
+
+      await SignUp(data.email, data.password, userData);
+      navigate("/room");
+      toast.success("Inscription réussie ! Bienvenue !");
+    } catch (error) {
+      if (error.code === "auth/email-already-in-use") {
+        toast.error("Cette adresse email est déjà utilisée");
+      } else if (error.code === "auth/weak-password") {
+        toast.error("Le mot de passe est trop faible");
+      } else {
+        toast.error("Erreur lors de l'inscription");
+      }
+    } finally {
+      setLoading(false);
+    }
+    reset();
+  };
+
+  // Style commun pour les inputs
+  const inputClass =
+    "bg-[rgb(43,53,66)] border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-[#0b525b] focus:ring-1 focus:ring-[#0b525b] transition text-sm w-full";
+  const labelClass = "text-xs text-gray-400 font-medium";
 
   return (
-    <>
-      <div
-        className="min-h-screen py-8 bg-gradient-to-br from-blue-400 to-cyan-400"
-        // style={{
-        //   backgroundImage: "url('/bg.jpg')",
-        //   backgroundSize: 'cover',
-        //   backgroundPosition: 'center'
-        // }}
-      >
+    <div className="min-h-screen flex items-start justify-center bg-black px-4 py-8 overflow-y-auto">
+      <div className="w-full max-w-md">
+        {/* LOGO + TITRE */}
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-16 h-16 mb-4">
+            <img
+              src="/logo.svg"
+              alt="Link logo"
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <h1 className="text-2xl font-bold text-white">Créer un compte</h1>
+          <p className="text-gray-400 text-sm mt-1">
+            Rejoignez votre espace étudiant ENSPD
+          </p>
+        </div>
+
+        {/* FORMULAIRE */}
         <form
           onSubmit={handleSubmit(handleSignUp)}
-          className="bg-white/90 backdrop-blur-sm p-6 rounded-xl shadow-lg w-full max-w-md mx-auto space-y-4"
+          className="bg-[rgb(31,36,46)] rounded-2xl p-6 space-y-4 border border-gray-700 shadow-2xl"
         >
-          <h2 className="text-2xl font-semibold text-center text-gray-800">
-            Inscription Étudiante
-          </h2>
-
-          {/* Pseudo */}
-          <div className="flex flex-col">
+          {/* Nom complet */}
+          <div className="flex flex-col gap-1">
+            <label className={labelClass}>Nom complet *</label>
             <input
               type="text"
-              placeholder="Nom complet"
+              placeholder="Jean-Paul Mbida"
+              className={inputClass}
               {...register("name", {
                 required: "Nom obligatoire",
-                minLength: {
-                  value: 2,
-                  message: "Le nom doit contenir au moins 2 caractères",
-                },
+                minLength: { value: 2, message: "Minimum 2 caractères" },
               })}
-              className="border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             {errors.name && (
-              <p className="text-red-500 text-sm mt-1">{errors.name.message}</p>
+              <p className="text-red-400 text-xs">{errors.name.message}</p>
             )}
           </div>
 
           {/* Matricule */}
-          <div className="flex flex-col">
+          <div className="flex flex-col gap-1">
+            <label className={labelClass}>Matricule *</label>
             <input
               type="text"
-              placeholder="Matricule (ex: 20J24001)"
+              placeholder="ex: 22I00690"
+              className={`${inputClass} uppercase`}
+              maxLength="9"
               {...register("matricule", {
                 required: "Matricule obligatoire",
                 pattern: {
@@ -141,21 +142,19 @@ export default function Signup() {
                   message: "Format invalide (ex: 20I24001)",
                 },
               })}
-              className="border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
-              maxLength="9"
             />
             {errors.matricule && (
-              <p className="text-red-500 text-sm mt-1">
-                {errors.matricule.message}
-              </p>
+              <p className="text-red-400 text-xs">{errors.matricule.message}</p>
             )}
           </div>
 
           {/* Email */}
-          <div className="flex flex-col">
+          <div className="flex flex-col gap-1">
+            <label className={labelClass}>Adresse email *</label>
             <input
               type="email"
-              placeholder="Email étudiant"
+              placeholder="exemple@enspd.univ-douala.cm"
+              className={inputClass}
               {...register("email", {
                 required: "Email obligatoire",
                 pattern: {
@@ -163,46 +162,50 @@ export default function Signup() {
                   message: "Format d'email invalide",
                 },
               })}
-              className="border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             {errors.email && (
-              <p className="text-red-500 text-sm mt-1">
-                {errors.email.message}
-              </p>
+              <p className="text-red-400 text-xs">{errors.email.message}</p>
             )}
           </div>
 
           {/* Département */}
-          <div className="flex flex-col">
+          <div className="flex flex-col gap-1">
+            <label className={labelClass}>Département *</label>
             <select
+              className={inputClass}
               {...register("departement", {
                 required: "Veuillez sélectionner votre département",
               })}
-              className="border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">Sélectionnez votre département</option>
+              <option value="" className="bg-[rgb(31,36,46)]">
+                Sélectionnez votre département
+              </option>
               {departements.map((dept, index) => (
-                <option key={index} value={dept}>
+                <option key={index} value={dept} className="bg-[rgb(31,36,46)]">
                   {dept}
                 </option>
               ))}
             </select>
             {errors.departement && (
-              <p className="text-red-500 text-sm mt-1">
+              <p className="text-red-400 text-xs">
                 {errors.departement.message}
               </p>
             )}
           </div>
 
-          {/* Niveau d'études */}
-          <div className="flex flex-col">
-            <select
-              {...register("niveau")}
-              className="border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Niveau d'études (optionnel)</option>
+          {/* Niveau */}
+          <div className="flex flex-col gap-1">
+            <label className={labelClass}>Niveau d'études</label>
+            <select className={inputClass} {...register("niveau")}>
+              <option value="" className="bg-[rgb(31,36,46)]">
+                Sélectionnez votre niveau
+              </option>
               {niveaux.map((niveau, index) => (
-                <option key={index} value={niveau}>
+                <option
+                  key={index}
+                  value={niveau}
+                  className="bg-[rgb(31,36,46)]"
+                >
                   {niveau}
                 </option>
               ))}
@@ -210,51 +213,50 @@ export default function Signup() {
           </div>
 
           {/* Mot de passe */}
-          <div className="flex flex-col">
+          <div className="flex flex-col gap-1">
+            <label className={labelClass}>Mot de passe *</label>
             <input
               type="password"
-              placeholder="Mot de passe (min. 8 caractères)"
+              placeholder="Minimum 8 caractères"
+              className={inputClass}
               {...register("password", {
                 required: "Mot de passe obligatoire",
-                minLength: {
-                  value: 8,
-                  message:
-                    "Le mot de passe doit contenir au moins 8 caractères",
-                },
+                minLength: { value: 8, message: "Minimum 8 caractères" },
               })}
-              className="border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             {errors.password && (
-              <p className="text-red-500 text-sm mt-1">
-                {errors.password.message}
-              </p>
+              <p className="text-red-400 text-xs">{errors.password.message}</p>
             )}
           </div>
 
-          {/* Bouton */}
+          {/* Bouton inscription */}
           <button
             type="submit"
             disabled={loading}
-            className={`w-full py-2 rounded-lg transition duration-200 ${
-              loading
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-blue-600 hover:bg-blue-700"
-            } text-white`}
+            className={`w-full py-3 rounded-xl font-semibold text-sm transition duration-200 mt-2
+              ${
+                loading
+                  ? "bg-gray-600 cursor-not-allowed text-gray-400"
+                  : "bg-[#0b525b] hover:bg-[#127f8a] text-white shadow-lg shadow-teal-900/30"
+              }`}
           >
-            {loading ? "Inscription en cours..." : "S'inscrire"}
+            {loading ? "Inscription en cours..." : "Créer mon compte"}
           </button>
         </form>
 
-        {/* Lien vers la page de login */}
-        <div className="text-center mt-4">
+        {/* Lien connexion */}
+        <div className="text-center mt-6">
           <Link
             to="/login"
-            className="text-white hover:underline bg-black/50 px-4 py-2 rounded-lg"
+            className="text-gray-400 hover:text-teal-400 text-sm transition"
           >
-            Déjà un compte ? Connecte-toi
+            Déjà un compte ?{" "}
+            <span className="text-teal-400 font-semibold hover:underline">
+              Connecte-toi
+            </span>
           </Link>
         </div>
       </div>
-    </>
+    </div>
   );
 }

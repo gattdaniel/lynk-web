@@ -1,90 +1,76 @@
-import { addDoc, collection,  deleteDoc,  doc,  getDocs, orderBy, query, serverTimestamp } from "firebase/firestore"
-import { useEffect, useState } from "react"
-import { db } from "../services/Firebase"
+import { useContext, useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
+import { collection, onSnapshot, orderBy, query, where,} from "firebase/firestore";
+import { db } from "../services/Firebase";
+import { AuthContext } from "../context/context";
+import Choice from "../components/choice";
+import MessageSender from "../components/Handlesend";
 
-export default function Privateroom(){
-    const [state, setState]=useState("")
-    const [room, setRoom]=useState([])
+export default function Department() {
+  const { user } = useContext(AuthContext);
+  const { deptId } = useParams();
+  const [messages, setMessages] = useState([]);
 
-    // function d'ajout de task
-    const HandleAdddoc=async(e)=>{
-       e.preventDefault()
-       if(!state.trim())return
-       try{
-        await addDoc(collection(db, "privateRoom"),{
-            state: state,
-            timestamp: serverTimestamp()
-        });
-        setState("");
-        fetchprivateroom();
-       }catch(error){
-        console.error(error)
-       }
-    }
+  useEffect(() => {
+    if (!deptId) return;
 
-    // function de surppression de task
-  const handledelete=async(id)=>{
-    try{
-      await deleteDoc(doc(db, 'privateroom', id))
-      fetchprivateroom()
-    }catch(error){
-      console.log(error)
-    }
-  }  
+    const q = query(
+      collection(db, "notifications"),
+      where("type", "==", "department"),
+      where("deptId", "==", deptId),
+      orderBy("timestamp", "desc")
+    );
 
-   // fonction de récupération des données
-    const fetchprivateroom=async()=>{
-        try{
-            const q= query(collection(db, "privateRoom"), orderBy("Timestamp", "desc"))
-            const querysnapshot = await getDocs(q)
-            const privateRoom= querysnapshot.docs.map((doc)=>({
-                id:doc.id,
-                ...doc.data
-            }))
-            setRoom(privateRoom)
-            return privateRoom
-        }catch(error){
-            console.error(error)
-        }
-    }
-     // appel de la function au prmier chargement
-      useEffect(() => {
-        fetchprivateroom();
-      }, []);
-    return(
-        <>
-             <form
-          onSubmit={HandleAdddoc}
-          className="w-[100vh] flex fixed bottom-0 left-1/2  transform -translate-x-1/2 items-center gap-2 bg-[#204b57] p-4 rounded-xl shadow-md"
-        >
-          <input
-            type="text"
-            placeholder="Entrez un message"
-            value={state}
-            onChange={(e) => setState(e.target.value)}
-            className="flex-1 px-4 py-2   bg-[#0b525b] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            type="submit"
-            className="px-4 py-2 bg-[#0b525b] text-white font-semibold rounded-lg hover:bg-blue-700 transition"
-          >
-            <img src="fleche.png" alt="Ajouter" className="w-5 h-5" />
-          </button>
-        </form>
-          <div className="h-[75vh]   w-[65vw] overflow-y-auto custom-scrollbar1 px-4 py-2 ">
-          {room.map((notif) => (
-            <div
-              key={notif.id}
-              className="mb-2 p-4 bg-[#204b57] rounded-lg shadow-sm border hover:bg-[#0b525b]"
-            >
-              <p className="text-gray-800 ">{notif.message}</p>
-              <p className="text-xs text-gray-500">
-                {new Date(notif.timestamp?.toDate()).toLocaleString()}
-              </p>
-              <button onClick={() => handledelete(notif.id)}>supprimer</button>
-            </div>
-          ))}
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setMessages(data);
+    });
+
+    return () => unsubscribe();
+  }, [deptId]);
+
+  return (
+    <div className="flex h-screen bg-black">
+      {/* Sidebar gauche */}
+      <div className="w-1/10 bg-black rounded">
+        <Choice />
+      </div>
+
+      {/* Contenu principal */}
+      <div className="flex flex-col flex-1 p-4">
+        <div className="flex-1 overflow-y-auto flex flex-col-reverse custom-scrollbar space-y-2 space-y-reverse px-2">
+          {messages.map((msg) => {
+            const isOwn = msg.uid === user?.uid;
+            return (
+              <div
+                key={msg.id}
+                className={`flex ${isOwn ? "justify-end" : "justify-start"}`}
+              >
+                <div
+                  className={`max-w-[70%] p-3 rounded-lg shadow-sm border break-words ${
+                    isOwn
+                      ? "bg-[rgb(31,36,46)] text-white rounded-br-none"
+                      : "bg-[rgb(31,36,46)] text-gray-200 rounded-bl-none"
+                  }`}
+                >
+                  <p>{msg.message}</p>
+                </div>
+              </div>
+            );
+          })}
         </div>
-        </>
-    )
+
+        {/* Formulaire d'envoi de messages */}
+        <MessageSender
+          collectionName="notifications"
+          type="department"
+          deptId={deptId}
+        />
+      </div>
+    </div>
+  );
 }
+
