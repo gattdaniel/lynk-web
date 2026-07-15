@@ -78,7 +78,7 @@ Une version mobile React Native est également disponible :
 
 ```bash
 # 1. Cloner le projet
-git clone https://github.com/gattdaniel/link1.git
+git clone https://github.com/gattdaniel/link.git
 cd link1
 
 # 2. Installer les dépendances
