@@ -82,15 +82,14 @@ export default function Signup() {
     reset();
   };
 
-  // Style commun pour les inputs
   const inputClass =
     "bg-[rgb(43,53,66)] border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-[#0b525b] focus:ring-1 focus:ring-[#0b525b] transition text-sm w-full";
   const labelClass = "text-xs text-gray-400 font-medium";
 
   return (
-    <div className="min-h-screen flex items-start justify-center bg-black px-4 py-8 overflow-y-auto">
-      <div className="w-full max-w-md">
-        {/* LOGO + TITRE */}
+    <div className="min-h-screen flex items-center justify-center bg-black px-4 py-8 overflow-y-auto">
+      {/* Container élargi ici (max-w-2xl) */}
+      <div className="w-full max-w-2xl">
         <div className="flex flex-col items-center mb-8">
           <div className="w-16 h-16 mb-4">
             <img
@@ -105,12 +104,11 @@ export default function Signup() {
           </p>
         </div>
 
-        {/* FORMULAIRE */}
+        {/* Formulaire en grille 2 colonnes avec plus d'espace (p-8) */}
         <form
           onSubmit={handleSubmit(handleSignUp)}
-          className="bg-[rgb(31,36,46)] rounded-2xl p-6 space-y-4 border border-gray-700 shadow-2xl"
+          className="bg-[rgb(31,36,46)] rounded-2xl p-8 grid grid-cols-1 md:grid-cols-2 gap-6 border border-gray-700 shadow-2xl"
         >
-          {/* Nom complet */}
           <div className="flex flex-col gap-1">
             <label className={labelClass}>Nom complet *</label>
             <input
@@ -127,7 +125,6 @@ export default function Signup() {
             )}
           </div>
 
-          {/* Matricule */}
           <div className="flex flex-col gap-1">
             <label className={labelClass}>Matricule *</label>
             <input
@@ -148,8 +145,7 @@ export default function Signup() {
             )}
           </div>
 
-          {/* Email */}
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 md:col-span-2">
             <label className={labelClass}>Adresse email *</label>
             <input
               type="email"
@@ -168,7 +164,6 @@ export default function Signup() {
             )}
           </div>
 
-          {/* Département */}
           <div className="flex flex-col gap-1">
             <label className={labelClass}>Département *</label>
             <select
@@ -193,7 +188,6 @@ export default function Signup() {
             )}
           </div>
 
-          {/* Niveau */}
           <div className="flex flex-col gap-1">
             <label className={labelClass}>Niveau d'études</label>
             <select className={inputClass} {...register("niveau")}>
@@ -212,8 +206,7 @@ export default function Signup() {
             </select>
           </div>
 
-          {/* Mot de passe */}
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 md:col-span-2">
             <label className={labelClass}>Mot de passe *</label>
             <input
               type="password"
@@ -229,22 +222,17 @@ export default function Signup() {
             )}
           </div>
 
-          {/* Bouton inscription */}
-          <button
-            type="submit"
-            disabled={loading}
-            className={`w-full py-3 rounded-xl font-semibold text-sm transition duration-200 mt-2
-              ${
-                loading
-                  ? "bg-gray-600 cursor-not-allowed text-gray-400"
-                  : "bg-[#0b525b] hover:bg-[#127f8a] text-white shadow-lg shadow-teal-900/30"
-              }`}
-          >
-            {loading ? "Inscription en cours..." : "Créer mon compte"}
-          </button>
+          <div className="md:col-span-2 mt-2">
+            <button
+              type="submit"
+              disabled={loading}
+              className={`w-full py-3 rounded-xl font-semibold text-sm transition duration-200 ${loading ? "bg-gray-600 cursor-not-allowed text-gray-400" : "bg-[#0b525b] hover:bg-[#127f8a] text-white shadow-lg shadow-teal-900/30"}`}
+            >
+              {loading ? "Inscription en cours..." : "Créer mon compte"}
+            </button>
+          </div>
         </form>
 
-        {/* Lien connexion */}
         <div className="text-center mt-6">
           <Link
             to="/login"
